@@ -1,0 +1,8 @@
+This product includes code adapted from Resilience4j (https://github.com/resilience4j/resilience4j)
+
+Copyright 2020 Robert Winkler, Bohdan Storozhuk, Mahmoud Romeh, Dan Maas and others.
+
+Licensed under the Apache License, Version 2.0.
+
+Modifications:
+- Adapted and modified specific circuit breaker behavior to fit project requirements.
