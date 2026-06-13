@@ -8,6 +8,33 @@
     <artifactId>resilience4j-cb-extension</artifactId>
     <version>1.0.0</version>
     <packaging>jar</packaging>
+    <name>Resilience4j Keyed Circuit Breaker Extension</name>
+    <description>A compile-time annotation processor and runtime executor that provides per-key circuit-breaker isolation on top of Resilience4j.</description>
+    <url>https://github.com/HarpuiaSaber/resilience4j-cb-extension</url>
+    <inceptionYear>2026</inceptionYear>
+
+    <developers>
+        <developer>
+            <id>toannq</id>
+            <name>Toan Nguyen</name>
+            <email>ztoan11120@gmail.com</email>
+            <url>https://github.com/HarpuiaSaber</url>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:git://github.com/HarpuiaSaber/resilience4j-cb-extension.git</connection>
+        <developerConnection>scm:git:git@github.com:HarpuiaSaber/resilience4j-cb-extension.git</developerConnection>
+        <url>https://github.com/HarpuiaSaber/resilience4j-cb-extension</url>
+    </scm>
+
+    <distributionManagement>
+        <repository>
+            <id>github</id>
+            <name>GitHub HarpuiaSaber Apache Maven Packages</name>
+            <url>https://maven.pkg.github.com/HarpuiaSaber/resilience4j-cb-extension</url>
+        </repository>
+    </distributionManagement>
 
     <licenses>
         <license>
@@ -20,6 +47,7 @@
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <maven.compiler.release>21</maven.compiler.release>
+        <java.version>21</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <auto-service.version>1.1.1</auto-service.version>
         <javapoet.version>1.13.0</javapoet.version>
@@ -123,8 +151,7 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.15.0</version>
                 <configuration>
-                    <source>${java.version}</source>
-                    <target>${java.version}</target>
+                    <release>${java.version}</release>
                     <annotationProcessorPaths>
                         <!-- Lets AutoService self-register our processor during its own compilation -->
                         <path>
@@ -147,6 +174,39 @@
                         --add-opens jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED
                         --add-opens jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
                     </argLine>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <version>3.3.1</version>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <goals>
+                            <goal>jar-no-fork</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <version>3.10.1</version>
+                <executions>
+                    <execution>
+                        <id>attach-javadocs</id>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
+                    <doclint>none</doclint>
                 </configuration>
             </plugin>
         </plugins>
