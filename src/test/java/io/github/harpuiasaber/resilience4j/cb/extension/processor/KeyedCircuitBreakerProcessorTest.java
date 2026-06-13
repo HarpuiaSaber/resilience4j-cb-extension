@@ -1,4 +1,4 @@
-package io.github.toannq.resilience4j.cb.extension.processor;
+package io.github.harpuiasaber.resilience4j.cb.extension.processor;
 
 import com.google.testing.compile.Compilation;
 import com.google.testing.compile.JavaFileObjects;
@@ -62,8 +62,8 @@ class KeyedCircuitBreakerProcessorTest {
       var c = compile("""
           com.example.SimpleClient
           package com.example;
-          import io.github.toannq.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
-          import io.github.toannq.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
+          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
+          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
           import org.springframework.stereotype.Component;
           import java.util.concurrent.CompletableFuture;
           
@@ -103,8 +103,8 @@ class KeyedCircuitBreakerProcessorTest {
       var c = compile("""
           com.example.NoFallbackClient
           package com.example;
-          import io.github.toannq.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
-          import io.github.toannq.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
+          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
+          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
           import org.springframework.stereotype.Component;
           import java.util.concurrent.CompletableFuture;
           
@@ -147,8 +147,8 @@ class KeyedCircuitBreakerProcessorTest {
       var c = compile("""
           com.example.MixedClient
           package com.example;
-          import io.github.toannq.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
-          import io.github.toannq.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
+          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
+          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
           import org.springframework.stereotype.Component;
           import java.util.concurrent.CompletableFuture;
           
@@ -179,8 +179,8 @@ class KeyedCircuitBreakerProcessorTest {
       var c = compile("""
           com.example.DefaultConfigClient
           package com.example;
-          import io.github.toannq.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
-          import io.github.toannq.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
+          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
+          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
           import org.springframework.stereotype.Component;
           import java.util.concurrent.CompletableFuture;
           
@@ -213,8 +213,8 @@ class KeyedCircuitBreakerProcessorTest {
       var c = compile("""
           com.example.BadClient
           package com.example;
-          import io.github.toannq.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
-          import io.github.toannq.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
+          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
+          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
           import org.springframework.stereotype.Component;
           
           @KeyedCircuitBreakerClient
@@ -235,8 +235,8 @@ class KeyedCircuitBreakerProcessorTest {
       var c = compile("""
           com.example.MissingResolverClient
           package com.example;
-          import io.github.toannq.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
-          import io.github.toannq.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
+          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
+          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
           import org.springframework.stereotype.Component;
           import java.util.concurrent.CompletableFuture;
           
@@ -258,8 +258,8 @@ class KeyedCircuitBreakerProcessorTest {
       var c = compile("""
           com.example.WrongReturnClient
           package com.example;
-          import io.github.toannq.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
-          import io.github.toannq.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
+          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
+          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
           import org.springframework.stereotype.Component;
           import java.util.concurrent.CompletableFuture;
           
@@ -283,8 +283,8 @@ class KeyedCircuitBreakerProcessorTest {
       var c = compile("""
           com.example.MismatchClient
           package com.example;
-          import io.github.toannq.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
-          import io.github.toannq.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
+          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
+          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
           import org.springframework.stereotype.Component;
           import java.util.concurrent.CompletableFuture;
           
@@ -308,8 +308,8 @@ class KeyedCircuitBreakerProcessorTest {
       var c = compile("""
           com.example.NoFallbackClient
           package com.example;
-          import io.github.toannq.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
-          import io.github.toannq.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
+          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
+          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
           import org.springframework.stereotype.Component;
           import java.util.concurrent.CompletableFuture;
           
@@ -331,8 +331,8 @@ class KeyedCircuitBreakerProcessorTest {
       var c = compile("""
           com.example.BadFallbackClient
           package com.example;
-          import io.github.toannq.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
-          import io.github.toannq.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
+          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
+          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
           import org.springframework.stereotype.Component;
           import java.util.concurrent.CompletableFuture;
           
@@ -356,7 +356,7 @@ class KeyedCircuitBreakerProcessorTest {
       var c = compile("""
           com.example.EmptyClient
           package com.example;
-          import io.github.toannq.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
+          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
           import org.springframework.stereotype.Component;
           import java.util.concurrent.CompletableFuture;
           
@@ -377,8 +377,8 @@ class KeyedCircuitBreakerProcessorTest {
       var c = compile("""
           com.example.FinalClient
           package com.example;
-          import io.github.toannq.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
-          import io.github.toannq.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
+          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
+          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
           import org.springframework.stereotype.Component;
           import java.util.concurrent.CompletableFuture;
 
@@ -400,8 +400,8 @@ class KeyedCircuitBreakerProcessorTest {
       var c = compile("""
           com.example.NoBeanClient
           package com.example;
-          import io.github.toannq.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
-          import io.github.toannq.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
+          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
+          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
           import java.util.concurrent.CompletableFuture;
 
           @KeyedCircuitBreakerClient
@@ -421,8 +421,8 @@ class KeyedCircuitBreakerProcessorTest {
       var c = compile("""
           com.example.PrimaryClient
           package com.example;
-          import io.github.toannq.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
-          import io.github.toannq.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
+          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
+          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
           import org.springframework.stereotype.Component;
           import org.springframework.context.annotation.Primary;
           import java.util.concurrent.CompletableFuture;
@@ -445,8 +445,8 @@ class KeyedCircuitBreakerProcessorTest {
     return """
         com.example.OrderClient
         package com.example;
-        import io.github.toannq.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
-        import io.github.toannq.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
+        import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
+        import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
         import org.springframework.stereotype.Component;
         import java.util.concurrent.CompletableFuture;
         
@@ -468,8 +468,8 @@ class KeyedCircuitBreakerProcessorTest {
     return """
         com.example.OrderClient
         package com.example;
-        import io.github.toannq.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
-        import io.github.toannq.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
+        import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
+        import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
         import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
         import org.springframework.stereotype.Component;
         import java.util.concurrent.CompletableFuture;

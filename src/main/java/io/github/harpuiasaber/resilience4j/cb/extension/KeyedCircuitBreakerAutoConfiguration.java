@@ -1,7 +1,7 @@
-package io.github.toannq.resilience4j.cb.extension;
+package io.github.harpuiasaber.resilience4j.cb.extension;
 
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
-import io.github.toannq.resilience4j.cb.extension.executor.KeyedCircuitBreakerExecutor;
+import io.github.harpuiasaber.resilience4j.cb.extension.executor.KeyedCircuitBreakerExecutor;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;

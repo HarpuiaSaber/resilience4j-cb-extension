@@ -1,1 +1,1 @@
-io.github.toannq.resilience4j.cb.extension.AsyncCircuitBreakerAutoConfiguration
+io.github.harpuiasaber.resilience4j.cb.extension.AsyncCircuitBreakerAutoConfiguration

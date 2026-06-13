@@ -51,7 +51,7 @@ Add to your `pom.xml`:
 
 ```xml
 <dependency>
-    <groupId>io.github.toannq</groupId>
+    <groupId>io.github.harpuiasaber</groupId>
     <artifactId>resilience4j-cb-extension</artifactId>
     <version>1.0.0</version>
 </dependency>

@@ -1,10 +1,10 @@
-package io.github.toannq.resilience4j.cb.extension.executor;
+package io.github.harpuiasaber.resilience4j.cb.extension.executor;
 
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.core.ConfigurationNotFoundException;
-import io.github.toannq.resilience4j.cb.extension.exception.CircuitBreakerInternalException;
+import io.github.harpuiasaber.resilience4j.cb.extension.exception.CircuitBreakerInternalException;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;

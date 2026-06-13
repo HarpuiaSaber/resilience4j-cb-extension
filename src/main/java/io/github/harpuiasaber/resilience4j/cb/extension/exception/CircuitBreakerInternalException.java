@@ -1,4 +1,4 @@
-package io.github.toannq.resilience4j.cb.extension.exception;
+package io.github.harpuiasaber.resilience4j.cb.extension.exception;
 
 /**
  * Thrown when resilience4j's {@code RecordExceptionPredicate} itself throws during {@code CircuitBreaker#onError()} recording.

@@ -1,4 +1,6 @@
-package io.github.toannq.resilience4j.cb.extension.annotation;
+package io.github.harpuiasaber.resilience4j.cb.extension.annotation;
+
+import io.github.harpuiasaber.resilience4j.cb.extension.executor.KeyedCircuitBreakerExecutor;
 
 import java.lang.annotation.*;
 
@@ -8,7 +10,7 @@ import java.lang.annotation.*;
  *
  * <p>Must be used on a method inside a type annotated with {@link KeyedCircuitBreakerClient}.
  * The annotation processor validates the method and generates a proxy that wraps
- * the annotated method invocation with {@link io.github.toannq.resilience4j.cb.extension.executor.KeyedCircuitBreakerExecutor}.
+ * the annotated method invocation with {@link KeyedCircuitBreakerExecutor}.
  *
  * <h3>How keyed CBs work (implementation notes)</h3>
  * <p>Each unique resolved key yields a distinct {@link io.github.resilience4j.circuitbreaker.CircuitBreaker}
@@ -41,7 +43,7 @@ import java.lang.annotation.*;
  *   <li>extends the original class;</li>
  *   <li>is annotated {@code @Component} and {@code @Primary};</li>
  *   <li>has a public constructor that takes two parameters: the original bean (qualified by
- *       the original bean name) and a {@link io.github.toannq.resilience4j.cb.extension.executor.KeyedCircuitBreakerExecutor}.</li>
+ *       the original bean name) and a {@link KeyedCircuitBreakerExecutor}.</li>
  * </ul>
  * See {@code KeyedCbProxyGenerator.buildCbMethod} and {@code KeyedCbProxyGenerator.buildConstructor} for details.
  */

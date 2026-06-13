@@ -1,4 +1,4 @@
-package io.github.toannq.resilience4j.cb.extension.processor;
+package io.github.harpuiasaber.resilience4j.cb.extension.processor;
 
 import com.squareup.javapoet.*;
 
@@ -18,7 +18,7 @@ class KeyedCbProxyGenerator {
   private static final ClassName SPRING_COMPONENT = ClassName.get("org.springframework.stereotype", "Component");
   private static final ClassName SPRING_PRIMARY = ClassName.get("org.springframework.context.annotation", "Primary");
   private static final ClassName SPRING_QUALIFIER = ClassName.get("org.springframework.beans.factory.annotation", "Qualifier");
-  private static final ClassName CB_EXECUTOR = ClassName.get("io.github.toannq.resilience4j.cb.extension.executor", "KeyedCircuitBreakerExecutor");
+  private static final ClassName CB_EXECUTOR = ClassName.get("io.github.harpuiasaber.resilience4j.cb.extension.executor", "KeyedCircuitBreakerExecutor");
   private static final String DELEGATE_FIELD = "delegate";
   private static final String EXECUTOR_FIELD = "circuitBreakerExecutor";
   private final ProcessingEnvironment processingEnv;

@@ -1,8 +1,8 @@
-package io.github.toannq.resilience4j.cb.extension.processor;
+package io.github.harpuiasaber.resilience4j.cb.extension.processor;
 
 import com.google.auto.service.AutoService;
-import io.github.toannq.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
-import io.github.toannq.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
+import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
+import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
 
 import javax.annotation.processing.*;
 import javax.lang.model.SourceVersion;
@@ -19,7 +19,7 @@ import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
 @AutoService(Processor.class)
-@SupportedAnnotationTypes("io.github.toannq.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient")
+@SupportedAnnotationTypes("io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient")
 @SupportedSourceVersion(SourceVersion.RELEASE_21)
 public class KeyedCircuitBreakerProcessor extends AbstractProcessor {
   private static final List<String> SPRING_BEAN_ANNOTATIONS = List.of(

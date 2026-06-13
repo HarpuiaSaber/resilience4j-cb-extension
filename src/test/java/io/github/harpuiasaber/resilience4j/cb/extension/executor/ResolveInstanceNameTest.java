@@ -1,4 +1,4 @@
-package io.github.toannq.resilience4j.cb.extension.executor;
+package io.github.harpuiasaber.resilience4j.cb.extension.executor;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

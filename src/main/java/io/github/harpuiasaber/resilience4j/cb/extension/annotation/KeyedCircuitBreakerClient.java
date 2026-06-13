@@ -1,6 +1,6 @@
-package io.github.toannq.resilience4j.cb.extension.annotation;
+package io.github.harpuiasaber.resilience4j.cb.extension.annotation;
 
-import io.github.toannq.resilience4j.cb.extension.executor.KeyedCircuitBreakerExecutor;
+import io.github.harpuiasaber.resilience4j.cb.extension.executor.KeyedCircuitBreakerExecutor;
 
 import java.lang.annotation.*;
 

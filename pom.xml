@@ -4,18 +4,20 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>io.github.toannq</groupId>
+    <groupId>io.github.harpuiasaber</groupId>
     <artifactId>resilience4j-cb-extension</artifactId>
     <version>1.0.0</version>
     <packaging>jar</packaging>
     <name>Resilience4j Keyed Circuit Breaker Extension</name>
-    <description>A compile-time annotation processor and runtime executor that provides per-key circuit-breaker isolation on top of Resilience4j.</description>
+    <description>A compile-time annotation processor and runtime executor that provides per-key circuit-breaker
+        isolation on top of Resilience4j.
+    </description>
     <url>https://github.com/HarpuiaSaber/resilience4j-cb-extension</url>
     <inceptionYear>2026</inceptionYear>
 
     <developers>
         <developer>
-            <id>toannq</id>
+            <id>harpuiasaber</id>
             <name>Toan Nguyen</name>
             <email>ztoan11120@gmail.com</email>
             <url>https://github.com/HarpuiaSaber</url>
@@ -27,14 +29,6 @@
         <developerConnection>scm:git:git@github.com:HarpuiaSaber/resilience4j-cb-extension.git</developerConnection>
         <url>https://github.com/HarpuiaSaber/resilience4j-cb-extension</url>
     </scm>
-
-    <distributionManagement>
-        <repository>
-            <id>github</id>
-            <name>GitHub HarpuiaSaber Apache Maven Packages</name>
-            <url>https://maven.pkg.github.com/HarpuiaSaber/resilience4j-cb-extension</url>
-        </repository>
-    </distributionManagement>
 
     <licenses>
         <license>
@@ -204,9 +198,32 @@
                     </execution>
                 </executions>
                 <configuration>
-                    <source>${java.version}</source>
-                    <target>${java.version}</target>
+                    <release>${java.version}</release>
                     <doclint>none</doclint>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-gpg-plugin</artifactId>
+                <version>3.2.8</version>
+                <executions>
+                    <execution>
+                        <id>sign-artifacts</id>
+                        <phase>verify</phase>
+                        <goals><goal>sign</goal></goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.sonatype.central</groupId>
+                <artifactId>central-publishing-maven-plugin</artifactId>
+                <version>0.10.0</version>
+                <extensions>true</extensions>
+                <configuration>
+                    <publishingServerId>central</publishingServerId>
+                    <autoPublish>true</autoPublish>
                 </configuration>
             </plugin>
         </plugins>
