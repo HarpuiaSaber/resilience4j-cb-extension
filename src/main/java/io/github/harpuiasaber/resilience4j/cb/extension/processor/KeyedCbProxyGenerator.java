@@ -27,42 +27,38 @@ class KeyedCbProxyGenerator {
     this.processingEnv = processingEnv;
   }
 
-  void generate(TypeElement typeEl, List<CircuitBreakerMethodSpec> specs, ExecutableElement superConstructor) {
+  void generate(TypeElement typeEl, List<CircuitBreakerMethodSpec> specs, TypeElement delegateTypeEl) {
     var packageName = processingEnv.getElementUtils().getPackageOf(typeEl).getQualifiedName().toString();
-    var proxyClassSpec = buildProxyClass(typeEl, specs, superConstructor);
+    var proxyClassSpec = buildProxyClass(typeEl, specs, delegateTypeEl);
     writeFile(packageName, proxyClassSpec);
   }
 
-  private TypeSpec buildProxyClass(TypeElement typeEl, List<CircuitBreakerMethodSpec> specs, ExecutableElement superConstructor) {
+  private TypeSpec buildProxyClass(TypeElement typeEl, List<CircuitBreakerMethodSpec> specs, TypeElement delegateTypeEl) {
     var cbSignatures = new HashSet<String>();
-    specs.forEach(s -> {
-      cbSignatures.add(signature(s.method()));
-      if (s.hasKeyResolver()) cbSignatures.add(signature(s.keyResolver()));
-      if (s.hasFallback()) cbSignatures.add(signature(s.fallback()));
-    });
     var allMethods = new ArrayList<MethodSpec>();
-    specs.forEach(cbMethodSpec -> allMethods.add(buildCbMethod(cbMethodSpec)));
+    specs.forEach(circuitBreakerSpec -> {
+      cbSignatures.add(signature(circuitBreakerSpec.method()));
+      allMethods.add(buildCbMethod(circuitBreakerSpec));
+    });
     typeEl.getEnclosedElements().stream()
         .filter(ExecutableElement.class::isInstance)
         .map(e -> (ExecutableElement) e)
         .filter(e -> e.getKind() == ElementKind.METHOD)
         .filter(e -> !cbSignatures.contains(signature(e)))
-        .filter(e -> !e.getModifiers().contains(Modifier.STATIC))
-        .filter(e -> !e.getModifiers().contains(Modifier.PRIVATE))
+        .filter(e -> !(e.getModifiers().contains(Modifier.STATIC) || e.getModifiers().contains(Modifier.DEFAULT)))
         .map(this::buildPassthrough)
         .forEach(allMethods::add);
-    var delegateType = TypeName.get(typeEl.asType());
     var simpleName = typeEl.getSimpleName().toString();
     var proxyName = simpleName + "KeyedCbProxy";
-    var beanName = Character.toLowerCase(simpleName.charAt(0)) + simpleName.substring(1);
+    var delegateType = TypeName.get(delegateTypeEl.asType());
     var builder = TypeSpec.classBuilder(proxyName)
         .addModifiers(Modifier.PUBLIC)
         .addAnnotation(SPRING_COMPONENT)
         .addAnnotation(SPRING_PRIMARY)
-        .superclass(delegateType)
+        .addSuperinterface(TypeName.get(typeEl.asType()))
         .addField(delegateType, DELEGATE_FIELD, Modifier.PRIVATE, Modifier.FINAL)
         .addField(CB_EXECUTOR, EXECUTOR_FIELD, Modifier.PRIVATE, Modifier.FINAL)
-        .addMethod(buildConstructor(delegateType, beanName, superConstructor));
+        .addMethod(buildConstructor(delegateType, delegateTypeEl.getSimpleName().toString()));
     typeEl.getTypeParameters().stream().map(TypeVariableName::get).forEach(builder::addTypeVariable);
     allMethods.forEach(builder::addMethod);
     return builder.build();
@@ -127,7 +123,8 @@ class KeyedCbProxyGenerator {
     return builder.build();
   }
 
-  private MethodSpec buildConstructor(TypeName delegateType, String beanName, ExecutableElement superConstructor) {
+  private MethodSpec buildConstructor(TypeName delegateType, String delegateBeanName) {
+    var beanName = Character.toLowerCase(delegateBeanName.charAt(0)) + delegateBeanName.substring(1);
     var constructorBuilder = MethodSpec.constructorBuilder()
         .addModifiers(Modifier.PUBLIC)
         .addParameter(ParameterSpec.builder(delegateType, DELEGATE_FIELD)
@@ -135,12 +132,6 @@ class KeyedCbProxyGenerator {
                 .addMember("value", "$S", beanName).build())
             .build())
         .addParameter(CB_EXECUTOR, EXECUTOR_FIELD);
-    if (superConstructor != null) {
-      var nullArgs = superConstructor.getParameters().stream()
-          .map(p -> "null")
-          .collect(Collectors.joining(", "));
-      constructorBuilder.addStatement("super($L)", nullArgs);
-    }
     constructorBuilder.addStatement("this.$L = $L", DELEGATE_FIELD, DELEGATE_FIELD)
         .addStatement("this.$L = $L", EXECUTOR_FIELD, EXECUTOR_FIELD);
     return constructorBuilder.build();

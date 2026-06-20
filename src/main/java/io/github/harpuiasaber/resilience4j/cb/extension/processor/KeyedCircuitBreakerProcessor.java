@@ -7,6 +7,7 @@ import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitB
 import javax.annotation.processing.*;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
+import javax.lang.model.type.MirroredTypeException;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.Types;
@@ -22,18 +23,12 @@ import java.util.stream.Collectors;
 @SupportedAnnotationTypes("io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient")
 @SupportedSourceVersion(SourceVersion.RELEASE_21)
 public class KeyedCircuitBreakerProcessor extends AbstractProcessor {
-  private static final List<String> SPRING_BEAN_ANNOTATIONS = List.of(
-      "org.springframework.stereotype.Component",
-      "org.springframework.stereotype.Service",
-      "org.springframework.stereotype.Repository",
-      "org.springframework.stereotype.Controller",
-      "org.springframework.web.bind.annotation.RestController"
-  );
 
   private Types typeUtils;
   private TypeMirror stringType;
   private TypeMirror callNotPermittedExceptionType;
   private TypeMirror completableFutureType;
+  private TypeMirror voidType;
 
   @Override
   public synchronized void init(ProcessingEnvironment processingEnv) {
@@ -43,6 +38,7 @@ public class KeyedCircuitBreakerProcessor extends AbstractProcessor {
     this.stringType = elementUtils.getTypeElement("java.lang.String").asType();
     this.callNotPermittedExceptionType = elementUtils.getTypeElement("io.github.resilience4j.circuitbreaker.CallNotPermittedException").asType();
     this.completableFutureType = typeUtils.erasure(elementUtils.getTypeElement("java.util.concurrent.CompletableFuture").asType());
+    this.voidType = elementUtils.getTypeElement("java.lang.Void").asType();
   }
 
   @Override
@@ -60,6 +56,8 @@ public class KeyedCircuitBreakerProcessor extends AbstractProcessor {
 
   private void process(TypeElement typeElement) {
     if (!validateType(typeElement)) return;
+    var delegateTypeEl = getDelegateTypeElement(typeElement);
+    if (delegateTypeEl == null) return;
     var methodsByName = ElementFilter.methodsIn(typeElement.getEnclosedElements())
         .stream()
         .collect(Collectors.groupingBy(m -> m.getSimpleName().toString()));
@@ -82,7 +80,6 @@ public class KeyedCircuitBreakerProcessor extends AbstractProcessor {
         hasError = true;
         continue;
       }
-
       var fallbackMethod = annotation.fallbackMethod();
       ExecutableElement fallbackEl = null;
       if (isNonEmpty(fallbackMethod) && (fallbackEl = resolveOptionalMethod(fallbackMethod, method, methodsByName,
@@ -94,51 +91,49 @@ public class KeyedCircuitBreakerProcessor extends AbstractProcessor {
     }
     if (hasError) return;
     if (circuitBreakerSpecs.isEmpty()) {
-      warn(typeElement, "@KeyedCircuitBreakerClient on '%s' has no @KeyedCircuitBreaker methods — no code will be generated", typeElement.getSimpleName());
+      warn(typeElement, "@KeyedCircuitBreakerClient on '%s' has no @KeyedCircuitBreaker methods — no code will be generated",
+          typeElement.getSimpleName());
       return;
     }
-
-    var superConstructor = resolveSuperConstructor(typeElement);
-    new KeyedCbProxyGenerator(processingEnv).generate(typeElement, circuitBreakerSpecs, superConstructor);
+    new KeyedCbProxyGenerator(processingEnv).generate(typeElement, circuitBreakerSpecs, delegateTypeEl);
   }
 
   private boolean validateType(TypeElement typeElement) {
-    if (typeElement.getKind() != ElementKind.CLASS) {
-      error(typeElement, "@KeyedCircuitBreakerClient can only be placed on a concrete class, not on '%s'. "
-          + "Interfaces are not supported — annotate the implementing class instead.", typeElement.getSimpleName());
+    if (typeElement.getKind() != ElementKind.INTERFACE) {
+      error(typeElement, "@KeyedCircuitBreakerClient can only be placed on an interface, not on '%s'.", typeElement.getSimpleName());
       return false;
     }
-    var isValid = true;
-    if (typeElement.getModifiers().contains(Modifier.FINAL)) {
-      error(typeElement, "@KeyedCircuitBreakerClient cannot be placed on a final class '%s'. "
-          + "The generated proxy must extend it.", typeElement.getSimpleName());
-      isValid = false;
-    }
-    var annotationNames = typeElement.getAnnotationMirrors().stream()
-        .map(am -> am.getAnnotationType().asElement().toString())
-        .collect(Collectors.toSet());
-    if (SPRING_BEAN_ANNOTATIONS.stream().noneMatch(annotationNames::contains)) {
-      error(typeElement, "@KeyedCircuitBreakerClient on '%s' requires the class to be a Spring bean "
-          + "(@Component, @Service, @Repository, @Controller, or @RestController).", typeElement.getSimpleName());
-      isValid = false;
-    }
-    if (annotationNames.contains("org.springframework.context.annotation.Primary")) {
-      error(typeElement, "@KeyedCircuitBreakerClient cannot be placed on a @Primary class '%s'. "
-              + "The generated proxy is already @Primary — having two @Primary beans of the same type will cause a startup conflict.",
-          typeElement.getSimpleName());
-      isValid = false;
-    }
-    return isValid;
+    return true;
   }
 
-  private ExecutableElement resolveSuperConstructor(TypeElement typeElement) {
-    var constructors = ElementFilter.constructorsIn(typeElement.getEnclosedElements());
-    var hasNoArg = constructors.stream().anyMatch(c -> c.getParameters().isEmpty());
-    if (hasNoArg) return null;
-    return constructors.stream()
-        .filter(c -> !c.getModifiers().contains(Modifier.PRIVATE))
-        .findFirst()
-        .orElse(null);
+  private TypeElement getDelegateTypeElement(TypeElement typeElement) {
+    var keyedCircuitBreakerClientAnnotation = typeElement.getAnnotation(KeyedCircuitBreakerClient.class);
+    try {
+      var delegateClass = keyedCircuitBreakerClientAnnotation.delegate();
+      if (delegateClass != Void.class) {
+        var delegateTypeEl = processingEnv.getElementUtils().getTypeElement(delegateClass.getCanonicalName());
+        if (delegateTypeEl == null) {
+          error(typeElement, "Delegate class '%s' specified in @KeyedCircuitBreakerClient on '%s' not found.",
+              delegateClass.getCanonicalName(), typeElement.getSimpleName());
+          return null;
+        }
+        return delegateTypeEl;
+      }
+    } catch (MirroredTypeException mte) {
+      var delegateTypeMirror = mte.getTypeMirror();
+      if (isAssignable(delegateTypeMirror, voidType)) {
+        error(typeElement, "@KeyedCircuitBreakerClient on interface '%s' requires either an explicit delegate or at least one concrete Spring bean implementing it.",
+            typeElement.getSimpleName());
+      }
+      if (isAssignable(delegateTypeMirror, typeElement.asType())) {
+        return (TypeElement) typeUtils.asElement(delegateTypeMirror);
+      }
+      error(typeElement, "Delegate type '%s' specified in @KeyedCircuitBreakerClient on '%s' is not assignable to the interface.",
+          delegateTypeMirror.toString(), typeElement.getSimpleName());
+    }
+    error(typeElement, "@KeyedCircuitBreakerClient on interface '%s' requires either an explicit delegate or at least one concrete Spring bean implementing it.",
+        typeElement.getSimpleName());
+    return null;
   }
 
   private ExecutableElement resolveOptionalMethod(String methodName, ExecutableElement original,
@@ -151,7 +146,14 @@ public class KeyedCircuitBreakerProcessor extends AbstractProcessor {
   private ExecutableElement resolveKeyResolver(ExecutableElement original, String resolverName, List<ExecutableElement> candidates) {
     var originalParams = original.getParameters();
     for (var candidate : candidates) {
-      if (isAssignable(candidate.getReturnType(), stringType) && hasSameParams(candidate.getParameters(), originalParams)) {
+      if (resolverName.equals(candidate.getSimpleName().toString())
+          && isAssignable(candidate.getReturnType(), stringType)
+          && hasSameParams(candidate.getParameters(), originalParams)) {
+        if (candidate.getModifiers().contains(Modifier.STATIC)) {
+          error(original, "Key resolver '%s' on '%s' is static, but must be non-static",
+              resolverName, original.getEnclosingElement().getSimpleName());
+          return null;
+        }
         return candidate;
       }
     }
@@ -163,16 +165,31 @@ public class KeyedCircuitBreakerProcessor extends AbstractProcessor {
   private ExecutableElement resolveFallback(ExecutableElement original, String fallbackName, List<ExecutableElement> candidates) {
     var originalParams = original.getParameters();
     for (var candidate : candidates) {
-      if (!isAssignable(candidate.getReturnType(), completableFutureType)) continue;
-      var params = candidate.getParameters();
-      if (params.size() != originalParams.size() + 1) continue;
-      if (isAssignable(params.getLast().asType(), callNotPermittedExceptionType) && hasSameParams(params.subList(0, params.size() - 1), originalParams)) {
-        return candidate;
+      if (!isValidFallbackCandidate(candidate, fallbackName, originalParams)) {
+        continue;
       }
+      if (candidate.getModifiers().contains(Modifier.STATIC)) {
+        error(original, "Fallback '%s' on '%s' is static, but must be non-static",fallbackName, original.getEnclosingElement().getSimpleName());
+        return null;
+      }
+      return candidate;
     }
     error(original, "Could not find fallback '%s' on '%s'. Expected: %s %s(%s, io.github.resilience4j.circuitbreaker.CallNotPermittedException e)",
         fallbackName, original.getEnclosingElement().getSimpleName(), original.getReturnType(), fallbackName, formatParams(originalParams));
     return null;
+  }
+
+  private boolean isValidFallbackCandidate(ExecutableElement candidate, String fallbackName, List<? extends VariableElement> originalParams) {
+    if (!fallbackName.equals(candidate.getSimpleName().toString())) {
+      return false;
+    }
+    if (!isAssignable(candidate.getReturnType(), completableFutureType)) {
+      return false;
+    }
+    var params = candidate.getParameters();
+    return params.size() == originalParams.size() + 1
+        && isAssignable(params.getLast().asType(), callNotPermittedExceptionType)
+        && hasSameParams(params.subList(0, params.size() - 1), originalParams);
   }
 
   private boolean isAssignable(TypeMirror t1, TypeMirror erasedType) {

@@ -5,11 +5,12 @@ Concise, actionable notes for coding agents: what to read first, project-specifi
 1) Big picture
 - Small library that provides per-key circuit-breaker helpers on top of Resilience4j.
 - Two responsibilities:
-  - Compile-time: an annotation processor scans classes annotated with `@KeyedCircuitBreakerClient` and emits a proxy subclass `<YourClass>KeyedCbProxy` using JavaPoet.
+  - Compile-time: an annotation processor scans interfaces annotated with `@KeyedCircuitBreakerClient` and emits a proxy implementation `<YourInterface>KeyedCbProxy` using JavaPoet.
   - Runtime: `KeyedCircuitBreakerExecutor` contains the per-key circuit-breaker logic used by generated proxies (instance naming, config resolution, permission/fallback handling).
 
 2) Read these files first (in this order)
 - `src/main/java/.../processor/KeyedCircuitBreakerProcessor.java` — processor entrypoint and validation rules (must read to know what source shapes are accepted).
+  - Note: The processor only supports placing `@KeyedCircuitBreakerClient` on interfaces. The processor will generate an implementing proxy that delegates to a concrete Spring bean specified via `delegate()`.
 - `src/main/java/.../processor/KeyedCbProxyGenerator.java` — codegen: proxy naming, constructor wiring, and generated method bodies.
 - `src/main/java/.../annotation/KeyedCircuitBreaker.java` and `KeyedCircuitBreakerClient.java` — annotation contracts and examples the processor expects.
 - `src/main/java/.../executor/KeyedCircuitBreakerExecutor.java` — runtime behavior and important utility methods: `resolveInstanceName`, `resolveConfig`.
@@ -18,17 +19,18 @@ Concise, actionable notes for coding agents: what to read first, project-specifi
 
 3) Project-specific rules you must know (precise)
 - Target type requirements (processor rules):
-  - `@KeyedCircuitBreakerClient` must be placed on a concrete, non-final class (not an interface).
-  - The target class must be a Spring bean: one of `@Component`, `@Service`, `@Repository`, `@Controller`, or `@RestController`.
-  - The processor rejects target classes annotated with `@Primary` (the generated proxy will be `@Primary`).
+  - `@KeyedCircuitBreakerClient` must be placed on an interface.
+    - The interface defines the contract methods annotated with `@KeyedCircuitBreaker`.
+    - `delegate()` is mandatory — the processor reports a compile-time error if omitted. There is no auto-discovery of implementations.
 - Generated proxy shape (see `KeyedCbProxyGenerator`):
-  - Class name: `<OriginalClassName>KeyedCbProxy`, in the same package.
+  - Class name: `<OriginalInterfaceName>KeyedCbProxy`, in the same package.
   - Annotations: `@Component` and `@Primary` on the generated proxy.
-  - Constructor: public constructor that accepts (1) the original bean instance qualified by bean name and (2) a `KeyedCircuitBreakerExecutor` instance. If the original class has no no-arg constructor, the generator resolves a non-private super-constructor and invokes it using null placeholders when necessary.
+  - Constructor: public constructor that accepts (1) a delegate instance implementing the interface and qualified by bean name derived from `delegate()`, and (2) a `KeyedCircuitBreakerExecutor` instance.
+  - Behavior: implements the interface and delegates non-`@KeyedCircuitBreaker` method calls transparently to the delegate.
 - Annotation contracts (processor enforces at compile time):
   - Methods annotated with `@KeyedCircuitBreaker` must return `CompletableFuture<T>`.
-  - `keyResolverMethod` (optional) must be a method on the same class that returns `String` and has identical parameters to the annotated method.
-  - `fallbackMethod` (optional) must be a method on the same class that returns `CompletableFuture<T>` and has the same parameters as the annotated method plus a final `io.github.resilience4j.circuitbreaker.CallNotPermittedException` parameter.
+  - `keyResolverMethod` (optional) must be a method on the same interface that returns `String` and has identical parameters to the annotated method. Must not be `static` — use a `default` method instead.
+  - `fallbackMethod` (optional) must be a method on the same interface that returns `CompletableFuture<T>` and has the same parameters as the annotated method plus a final `io.github.resilience4j.circuitbreaker.CallNotPermittedException` parameter. Must not be `static` — use a `default` method instead.
 
 4) Runtime behavior highlights (from `KeyedCircuitBreakerExecutor`)
 - Instance name: `"<baseName>:<resolvedKey>"` when key present; otherwise `baseName` (null/blank key behavior described in executor).
@@ -38,25 +40,26 @@ Concise, actionable notes for coding agents: what to read first, project-specifi
 
 5) Build / test / dev commands
 - Full build + tests (recommended):
-  ```powershell
+```powershell
   mvn -DskipTests=false clean package
-  ```
+```
 - Run tests only:
-  ```powershell
+```powershell
   mvn test
-  ```
+```
 - Fast package (skip tests):
-  ```powershell
+```powershell
   mvn -DskipTests=true package
-  ```
+```
 - Notes:
   - Project targets Java 21. Tests use google compile-testing; run tests via Maven to ensure proper JVM flags.
   - Enable annotation processing in your IDE to preview generated sources in `target/generated-sources`.
 
 6) Common gotchas (do not assume defaults)
 - Many runtime deps (Spring, Resilience4j) are `provided` in `pom.xml`. Tests create their own runtime instances — don't assume those jars are present at compile time in host apps.
-- Processor enforces the class must be a Spring bean and concrete. If you change the processor to accept interfaces or non-beans, update many tests that assume the current validation.
-- The processor explicitly rejects classes annotated with `@Primary` to avoid conflicts — if you change this behavior, update tests and the generated proxy wiring.
+- Processor enforces the target must be an interface — placing `@KeyedCircuitBreakerClient` on a concrete class is a compile-time error. If you change this, update tests that assert this validation.
+- `delegate()` is always required — there is no fallback auto-discovery. If you add auto-discovery, update the processor validation and related tests.
+- `keyResolverMethod` and `fallbackMethod` must not be `static` methods — the processor explicitly rejects them with a descriptive error. Use `default` methods instead.
 - Auto-config resource `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports` may be stale — verify its contents when editing `KeyedCircuitBreakerAutoConfiguration`.
 
 7) How to add features safely
@@ -72,9 +75,5 @@ Concise, actionable notes for coding agents: what to read first, project-specifi
 - Runtime: `KeyedCircuitBreakerExecutor.resolveInstanceName`, `resolveConfig`, execute/permission/fallback handling.
 - Examples & tests: `src/test/java/.../processor/KeyedCircuitBreakerProcessorTest.java` and `src/test/java/.../executor/KeyedCircuitBreakerExecutorTest.java`.
 
-If you want, I can also:
-- add a short CONTRIBUTING.md with exact Maven commands and CI hints
-- update the AutoConfiguration.imports resource if you want the packaged auto-config to match the code
-
 ---
-Generated/updated to match current processor rules (requires concrete Spring beans, rejects @Primary targets, fallback uses CallNotPermittedException). Review tests when changing validation or generated proxy shape.
+Generated/updated to match current processor rules (requires interface targets, mandatory explicit delegate via `delegate()`, static contract methods rejected). Review tests when changing validation or generated proxy shape.

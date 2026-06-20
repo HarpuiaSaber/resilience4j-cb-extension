@@ -1,71 +1,62 @@
 package io.github.harpuiasaber.resilience4j.cb.extension.annotation;
 
-import io.github.harpuiasaber.resilience4j.cb.extension.executor.KeyedCircuitBreakerExecutor;
-
 import java.lang.annotation.*;
 
 /**
- * Marks a class for compile-time keyed circuit breaker proxy generation.
+ * Marks an interface for compile-time keyed circuit breaker proxy generation.
  *
- * <p>The annotation processor scans the target class for methods annotated with
- * {@link KeyedCircuitBreaker} and generates a proxy subclass in the same package:
+ * <p>The annotation processor scans the target interface for methods annotated with
+ * {@link KeyedCircuitBreaker} and generates a proxy implementation in the same package
+ * named {@code <InterfaceName>KeyedCbProxy}.
  *
- * <ul>
- *   <li>{@code <ClassName>KeyedCbProxy} – extends the target class and overrides
- *       methods annotated with {@link KeyedCircuitBreaker}. Annotated methods are
- *       wrapped using {@link KeyedCircuitBreakerExecutor}, while all other methods
- *       retain the original behavior. Contract methods referenced by {@link KeyedCircuitBreaker}
- *       are inherited directly from the target class and are not overridden in the generated proxy.</li>
- * </ul>
+ * <p>The generated proxy <b>implements</b> the annotated interface and delegates all method
+ * calls to the concrete implementation bean specified by {@link #delegate()}. The delegate
+ * bean is identified at runtime via Spring {@code @Qualifier} using the lower-camel-case
+ * simple name of the specified class.
  *
  * <p>The generated proxy is registered as a Spring {@code @Component} and {@code @Primary}
- * bean so existing injection points continue to work transparently for both concrete class and interface
- * injection.
+ * bean so existing injection points for the interface continue to work transparently,
+ * receiving the proxy instead of the original implementation.
  *
- * <p>To satisfy Java inheritance rules the generator mirrors available constructor shape by emitting
- * a public constructor on the proxy that accepts two parameters: the original bean (qualified by its bean name)
- * and a {@link KeyedCircuitBreakerExecutor} instance. If the target class has no no-arg constructor, the
- * generated constructor will invoke the superclass constructor with {@code null} placeholders for parameters
- * (see {@code KeyedCbProxyGenerator.buildConstructor}).
- *
- * <p><b>Limitations:</b>
- * <ul>
- *   <li>The target class must not be {@code final}.</li>
- *   <li>Annotated methods must not be {@code final} or {@code private}.</li>
- *   <li>Dependencies declared only through constructor injection in the target class
- *       are not injected into generated proxy instances — the proxy receives the original bean
- *       instance as a delegate instead.</li>
- *   <li>The annotation processor rejects target classes that are already annotated with
- *       {@code @Primary}. The generator marks the proxy {@code @Primary} and placing
- *       {@code @KeyedCircuitBreakerClient} on a {@code @Primary} class would conflict.</li>
- * </ul>
+ * <p>{@link #delegate()} is mandatory — the processor reports a compile-time error if omitted.
  *
  * <h3>Example</h3>
  * <pre>{@code
- * @Service
- * @KeyedCircuitBreakerClient
- * public class ExampleClient {
+ * @KeyedCircuitBreakerClient(delegate = ExampleServiceImpl.class)
+ * public interface ExampleService {
  *
- *     private final Dependency dependency;
+ *     @KeyedCircuitBreaker(name = "example", keyResolverMethod = "resolveKey", fallbackMethod = "fallback")
+ *     CompletableFuture<String> call(String input);
  *
- *     public ExampleClient(Dependency dependency) {
- *         this.dependency = dependency;
+ *     // Key resolver: same params, returns String.
+ *     // Can be a default method so implementations are not forced to override.
+ *     default String resolveKey(String input) { return input; }
+ *
+ *     // Fallback: same params + CallNotPermittedException, returns CompletableFuture<String>.
+ *     // Can be a default method so implementations are not forced to override.
+ *     default CompletableFuture<String> fallback(String input, CallNotPermittedException e) {
+ *         return CompletableFuture.failedFuture(e);
  *     }
  *
- *     @KeyedCircuitBreaker(name = "example", keyResolverMethod = "resolveKey")
+ *     // Not annotated — forwarded transparently to the delegate
+ *     CompletableFuture<Boolean> check(String input);
+ * }
+ *
+ * @Service
+ * public class ExampleServiceImpl implements ExampleService {
+ *
+ *     @Override
  *     public CompletableFuture<String> call(String input) {
  *         return CompletableFuture.completedFuture("ok");
  *     }
  *
- *     // Key resolver: same params, returns String
- *     public String resolveKey(String input) {
- *         return input;
- *     }
- *
- *     // Not annotated — keeps original behavior
+ *     @Override
  *     public CompletableFuture<Boolean> check(String input) {
  *         return CompletableFuture.completedFuture(true);
  *     }
+ *
+ *     // resolveKey and fallback are inherited from the interface default —
+ *     // override only when custom behaviour is needed.
  * }
  * }</pre>
  */
@@ -73,4 +64,12 @@ import java.lang.annotation.*;
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.SOURCE)
 public @interface KeyedCircuitBreakerClient {
+  /**
+   * The concrete implementation class to use as the delegate at runtime. Mandatory —
+   * the processor reports a compile-time error if not specified.
+   *
+   * <p>The processor derives the Spring {@code @Qualifier} bean name from this class's
+   * simple name (lower-camel-case) and injects it into the generated proxy constructor.
+   */
+  Class<?> delegate() default Void.class;
 }

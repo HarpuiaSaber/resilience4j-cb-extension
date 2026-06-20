@@ -13,37 +13,47 @@ A compile-time annotation processor and runtime executor that provides **per-key
 ## Quick Example
 
 ```java
+@KeyedCircuitBreakerClient(delegate = PaymentClientImpl.class)
+public interface PaymentClient {
+
+   @KeyedCircuitBreaker(
+           name = "payment",
+           configName = "paymentService",
+           keyResolverMethod = "resolveRegion",
+           fallbackMethod = "paymentFallback"
+   )
+   CompletableFuture<String> pay(String region, String orderId);
+
+   // Key resolver: can be a default method — override only for custom logic
+   default String resolveRegion(String region, String orderId) {
+      return region;
+   }
+
+   // Fallback: can be a default method — override only for custom logic
+   default CompletableFuture<String> paymentFallback(String region, String orderId, CallNotPermittedException e) {
+      return CompletableFuture.completedFuture("payment-pending");
+   }
+}
+
+// Concrete implementation — only needs to implement the real business method
 @Service
-@KeyedCircuitBreakerClient
-public class PaymentClient {
+public class PaymentClientImpl implements PaymentClient {
 
-    @KeyedCircuitBreaker(
-        name = "payment",
-        keyResolverMethod = "resolveRegion",
-        fallbackMethod = "paymentFallback"
-    )
-    public CompletableFuture<String> pay(String region, String orderId) {
-        return callExternalPaymentService(region, orderId);
-    }
+   @Override
+   public CompletableFuture<String> pay(String region, String orderId) {
+      return callExternalPaymentService(region, orderId);
+   }
 
-    // Key resolver: returns the circuit breaker key
-    public String resolveRegion(String region, String orderId) {
-        return region;
-    }
-
-    // Fallback: called when circuit is OPEN
-    public CompletableFuture<String> paymentFallback(
-            String region, String orderId, 
-            CallNotPermittedException e) {
-        return CompletableFuture.completedFuture("payment-pending");
-    }
+   // resolveRegion and paymentFallback are inherited from interface defaults.
+   // Override here only when custom behaviour is needed.
 }
 ```
 
 The processor generates `PaymentClientKeyedCbProxy` which:
-- Extends the original class
+- Implements the `PaymentClient` interface
 - Overrides `@KeyedCircuitBreaker` methods to wrap them with the executor
-- Is registered as a Spring `@Primary` bean, replacing the original
+- Delegates non-circuit-breaker methods to the concrete implementation
+- Is registered as a Spring `@Primary` bean, replacing the original bean at injection points
 
 ## Installation
 
@@ -53,7 +63,7 @@ Add to your `pom.xml`:
 <dependency>
     <groupId>io.github.harpuiasaber</groupId>
     <artifactId>resilience4j-cb-extension</artifactId>
-    <version>1.0.0</version>
+    <version>2.0.0</version>
 </dependency>
 ```
 
@@ -64,7 +74,7 @@ Requires:
 
 ## Configuration
 
-Each keyed circuit breaker requires a Resilience4j configuration. Define in `application.yaml`:
+Each keyed circuit breaker requires a Resilience4j configuration. Define in `application.yaml` or at configuration code or specify `configName` in `@KeyedCircuitBreaker` for all keys:
 
 ```yaml
 resilience4j:
@@ -104,21 +114,15 @@ mvn test
 mvn -DskipTests=true package
 ```
 
-## Limitations
-
-- Target class must be **not final** and a **concrete Spring bean** (`@Component`, `@Service`, `@Repository`, `@Controller`, or `@RestController`).
-- Target class must not be annotated with `@Primary` (processor will reject it; the generated proxy is `@Primary`).
-- Annotated methods must return `CompletableFuture<T>`.
-- **Constructor-injected dependencies** in the target class are not automatically injected into the proxy. Instead, the proxy receives the original bean instance as a delegate.
-
-## Validation Rules (Compile-Time)
+## Rules and validations
 
 The processor enforces:
 
-1. **Target class**: concrete, not final, is a Spring bean, not `@Primary`.
+1. **Target**: must be an interface.
+   - `@KeyedCircuitBreakerClient(delegate = ...)` is mandatory — the processor reports a compile-time error if omitted.
 2. **Annotated methods**: must return `CompletableFuture<T>`.
-3. **Key resolver (optional)**: must return `String` and have the same parameters as the annotated method.
-4. **Fallback (optional)**: must return `CompletableFuture<T>`, have the same parameters as the annotated method, plus a final `CallNotPermittedException` parameter.
+3. **Key resolver (optional)**: must return `String` and have the same parameters as the annotated method. Must not be `static` — use a `default` method instead.
+4. **Fallback (optional)**: must return `CompletableFuture<T>`, have the same parameters as the annotated method, plus a final `CallNotPermittedException` parameter. Must not be `static` — use a `default` method instead.
 
 ## Documentation
 

@@ -6,7 +6,7 @@
 
     <groupId>io.github.harpuiasaber</groupId>
     <artifactId>resilience4j-cb-extension</artifactId>
-    <version>1.0.0</version>
+    <version>2.0.0</version>
     <packaging>jar</packaging>
     <name>Resilience4j Keyed Circuit Breaker Extension</name>
     <description>A compile-time annotation processor and runtime executor that provides per-key circuit-breaker

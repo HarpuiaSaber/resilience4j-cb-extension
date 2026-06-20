@@ -11,15 +11,15 @@ import java.util.Arrays;
 import static com.google.testing.compile.CompilationSubject.assertThat;
 import static com.google.testing.compile.Compiler.javac;
 
-@DisplayName("KeyedCircuitBreakerProcessor — compile-time tests")
+@DisplayName("KeyedCircuitBreakerProcessor — compile-time tests (interface-only)")
 class KeyedCircuitBreakerProcessorTest {
 
   private Compilation compile(String... sources) {
     var fileObjects = Arrays.stream(sources)
         .map(src -> {
           int nl = src.indexOf('\n');
-          String path = src.substring(0, nl).trim();
-          String body = src.substring(nl + 1);
+          var path = src.substring(0, nl).trim();
+          var body = src.substring(nl + 1);
           return JavaFileObjects.forSourceString(path, body);
         })
         .toList();
@@ -34,172 +34,282 @@ class KeyedCircuitBreakerProcessorTest {
   class SuccessfulGeneration {
 
     @Test
-    @DisplayName("generates KeyedCbProxy file")
-    void generatesProxyFile() {
-      var c = compile(orderClientWithKeyResolver());
+    @DisplayName("generates proxy for interface with default method")
+    void generatesProxyFileWithDefaultContractMethod() {
 
+      var c = compile(
+          """
+              com.example.OrderApi
+              package com.example;
+              
+              import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
+              import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
+              import java.util.concurrent.CompletableFuture;
+              import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+              
+              @KeyedCircuitBreakerClient(delegate = OrderClientImpl.class)
+              public interface OrderApi {
+              
+                  @KeyedCircuitBreaker(name = "order", keyResolverMethod = "resolveOrderKey", fallbackMethod = "fetchOrderFallback")
+                  CompletableFuture<String> fetchOrder(String region, String tier);
+              
+                  default String resolveOrderKey(String region, String tier) { return region + ":" + tier; };
+              
+                  default CompletableFuture<String> fetchOrderFallback(String region, String tier, CallNotPermittedException e) { return CompletableFuture.failedFuture(new RuntimeException("cb error")); };
+              
+                  CompletableFuture<Void> cancelOrder(String id);
+              }
+              """,
+          """
+              com.example.OrderClientImpl
+              package com.example;
+              
+              import org.springframework.stereotype.Component;
+              import java.util.concurrent.CompletableFuture;
+              
+              @Component
+              public class OrderClientImpl implements OrderApi {
+              
+                  public CompletableFuture<String> fetchOrder(String region, String tier) {
+                      return CompletableFuture.completedFuture("ok");
+                  }
+              
+                  public CompletableFuture<Void> cancelOrder(String id) {
+                      return CompletableFuture.completedFuture(null);
+                  }
+              }
+              """);
       assertThat(c).succeeded();
-      assertThat(c).generatedSourceFile("com.example.OrderClientKeyedCbProxy");
+      var content = assertThat(c).generatedSourceFile("com.example.OrderApiKeyedCbProxy")
+          .contentsAsUtf8String();
+      content.doesNotContain("public String resolveOrderKey");
+      content.doesNotContain("public CompletableFuture<String> fetchOrderFallback");
     }
 
     @Test
-    @DisplayName("delegate calls cbExecutor.execute with _cbKey variable from resolver")
-    void delegateCallsExecuteWithKeyVariable() {
-      var c = compile(orderClientWithKeyResolver());
+    @DisplayName("generates proxy for interface with explicit delegate")
+    void generatesProxyFileForInterface() {
 
+      var c = compile(
+          """
+              com.example.OrderApi
+              package com.example;
+              
+              import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
+              import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
+              import java.util.concurrent.CompletableFuture;
+              
+              @KeyedCircuitBreakerClient(delegate = com.example.OrderClientImpl.class)
+              public interface OrderApi {
+              
+                  @KeyedCircuitBreaker(name = "order", keyResolverMethod = "resolveOrderKey")
+                  CompletableFuture<String> fetchOrder(String region, String tier);
+              
+                  String resolveOrderKey(String region, String tier);
+              
+                  CompletableFuture<Void> cancelOrder(String id);
+              }
+              """,
+          """
+              com.example.OrderClientImpl
+              package com.example;
+              
+              import org.springframework.stereotype.Component;
+              import java.util.concurrent.CompletableFuture;
+              
+              @Component
+              public class OrderClientImpl implements OrderApi {
+              
+                  public CompletableFuture<String> fetchOrder(String region, String tier) {
+                      return CompletableFuture.completedFuture("ok");
+                  }
+              
+                  public String resolveOrderKey(String region, String tier) {
+                      return region + ":" + tier;
+                  }
+              
+                  public CompletableFuture<Void> cancelOrder(String id) {
+                      return CompletableFuture.completedFuture(null);
+                  }
+              }
+              """);
+      assertThat(c).succeeded();
+      assertThat(c).generatedSourceFile("com.example.OrderApiKeyedCbProxy");
+    }
+
+    @Test
+    @DisplayName("proxy implements interface and uses @Qualifier delegate")
+    void proxyImplementsInterface() {
+      var c = compile(
+          """
+              com.example.OrderApi
+              package com.example;
+              
+              import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
+              import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
+              import java.util.concurrent.CompletableFuture;
+              
+              @KeyedCircuitBreakerClient(delegate = com.example.OrderClientImpl.class)
+              public interface OrderApi {
+              
+                  @KeyedCircuitBreaker(name = "order", keyResolverMethod = "resolveOrderKey")
+                  CompletableFuture<String> fetchOrder(String region, String tier);
+              
+                  String resolveOrderKey(String region, String tier);
+              
+                  CompletableFuture<Void> cancelOrder(String id);
+              }
+              """,
+          """
+              com.example.OrderClientImpl
+              package com.example;
+              
+              import org.springframework.stereotype.Component;
+              import java.util.concurrent.CompletableFuture;
+              
+              @Component
+              public class OrderClientImpl implements OrderApi {
+              
+                  public CompletableFuture<String> fetchOrder(String region, String tier) {
+                      return CompletableFuture.completedFuture("ok");
+                  }
+              
+                  public String resolveOrderKey(String region, String tier) {
+                      return region + ":" + tier;
+                  }
+              
+                  public CompletableFuture<Void> cancelOrder(String id) {
+                      return CompletableFuture.completedFuture(null);
+                  }
+              }
+              """);
       assertThat(c).succeeded();
       var contents = assertThat(c)
-          .generatedSourceFile("com.example.OrderClientKeyedCbProxy")
+          .generatedSourceFile("com.example.OrderApiKeyedCbProxy")
           .contentsAsUtf8String();
-      contents.contains("var cbKey = this.delegate.resolveOrderKey(");
-      contents.contains("this.circuitBreakerExecutor.execute(");
-      contents.contains("cbKey");
+      contents.contains("implements OrderApi");
+      contents.contains("@Qualifier(");
     }
 
     @Test
-    @DisplayName("no keyResolverMethod → passes null as key argument")
-    void noKeyResolver_passesNullKey() {
-      var c = compile("""
-          com.example.SimpleClient
-          package com.example;
-          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
-          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
-          import org.springframework.stereotype.Component;
-          import java.util.concurrent.CompletableFuture;
-          
-          @KeyedCircuitBreakerClient
-          @Component
-          public class SimpleClient {
-              @KeyedCircuitBreaker(name = "simple")
-              public CompletableFuture<String> fetch(String id) {
-                  return CompletableFuture.completedFuture("ok");
+    @DisplayName("with fallback - generates fallback handler")
+    void withFallbackGeneratesHandler() {
+      var c = compile(
+          """
+              com.example.OrderApi
+              package com.example;
+              
+              import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
+              import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
+              import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+              import java.util.concurrent.CompletableFuture;
+              
+              @KeyedCircuitBreakerClient(delegate = com.example.OrderClientImpl.class)
+              public interface OrderApi {
+              
+                  @KeyedCircuitBreaker(
+                      name = "order",
+                      keyResolverMethod = "resolveOrderKey",
+                      fallbackMethod = "fetchOrderFallback"
+                  )
+                  CompletableFuture<String> fetchOrder(String region, String tier);
+              
+                  String resolveOrderKey(String region, String tier);
+              
+                  CompletableFuture<String> fetchOrderFallback(
+                      String region,
+                      String tier,
+                      CallNotPermittedException e
+                  );
+              
+                  CompletableFuture<Void> cancelOrder(String id);
               }
-          }
-          """);
-
-      assertThat(c).succeeded();
-      var src = assertThat(c)
-          .generatedSourceFile("com.example.SimpleClientKeyedCbProxy")
-          .contentsAsUtf8String();
-      src.contains("null");
-      src.doesNotContain("cbKey");
-    }
-
-    @Test
-    @DisplayName("fallbackMethod set → delegate contains fallback lambda, not null")
-    void withFallback_generatesFallbackLambda() {
-      var c = compile(orderClientWithKeyResolverAndFallback());
-
+              """,
+          """
+              com.example.OrderClientImpl
+              package com.example;
+              
+              import org.springframework.stereotype.Component;
+              import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+              import java.util.concurrent.CompletableFuture;
+              
+              @Component
+              public class OrderClientImpl implements OrderApi {
+              
+                  public CompletableFuture<String> fetchOrder(String region, String tier) {
+                      return CompletableFuture.completedFuture("ok");
+                  }
+              
+                  public String resolveOrderKey(String region, String tier) {
+                      return region + ":" + tier;
+                  }
+              
+                  public CompletableFuture<String> fetchOrderFallback(
+                      String region,
+                      String tier,
+                      CallNotPermittedException e
+                  ) {
+                      return CompletableFuture.completedFuture("fallback");
+                  }
+              
+                  public CompletableFuture<Void> cancelOrder(String id) {
+                      return CompletableFuture.completedFuture(null);
+                  }
+              }
+              """);
       assertThat(c).succeeded();
       assertThat(c)
-          .generatedSourceFile("com.example.OrderClientKeyedCbProxy")
+          .generatedSourceFile("com.example.OrderApiKeyedCbProxy")
           .contentsAsUtf8String()
           .contains("fetchOrderFallback");
     }
 
     @Test
-    @DisplayName("no fallbackMethod → execute call ends with , null)")
-    void noFallback_passesNullFallback() {
-      var c = compile("""
-          com.example.NoFallbackClient
-          package com.example;
-          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
-          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
-          import org.springframework.stereotype.Component;
-          import java.util.concurrent.CompletableFuture;
-          
-          @KeyedCircuitBreakerClient
-          @Component
-          public class NoFallbackClient {
-              @KeyedCircuitBreaker(name = "cb")
-              public CompletableFuture<String> fetch(String id) {
-                  return CompletableFuture.completedFuture("ok");
-              }
-          }
-          """);
-
-      assertThat(c).succeeded();
-      assertThat(c)
-          .generatedSourceFile("com.example.NoFallbackClientKeyedCbProxy")
-          .contentsAsUtf8String()
-          .contains("null)");
-    }
-
-    @Test
-    @DisplayName("configuration contains @Component, @Bean, @Primary, @Qualifier")
-    void configurationAnnotations() {
-      var c = compile(orderClientWithKeyResolver());
-
-      assertThat(c).succeeded();
-      var contents = assertThat(c)
-          .generatedSourceFile("com.example.OrderClientKeyedCbProxy")
-          .contentsAsUtf8String();
-      contents.contains("@Component");
-      contents.contains("@Primary");
-      contents.contains("@Qualifier(");
-      contents.contains("this.delegate");
-      contents.contains("this.circuitBreakerExecutor");
-    }
-
-    @Test
-    @DisplayName("non-annotated method generates passthrough delegation (no cbExecutor call)")
+    @DisplayName("non-annotated methods delegate passthrough")
     void passthroughForNonAnnotatedMethod() {
-      var c = compile("""
-          com.example.MixedClient
-          package com.example;
-          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
-          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
-          import org.springframework.stereotype.Component;
-          import java.util.concurrent.CompletableFuture;
-          
-          @KeyedCircuitBreakerClient
-          @Component
-          public class MixedClient {
-              @KeyedCircuitBreaker(name = "mixed")
-              public CompletableFuture<String> tracked(String id) {
-                  return CompletableFuture.completedFuture("ok");
+      var c = compile(
+          """
+              com.example.MixedApi
+              package com.example;
+              
+              import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
+              import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
+              import java.util.concurrent.CompletableFuture;
+              
+              @KeyedCircuitBreakerClient(delegate = com.example.MixedImpl.class)
+              public interface MixedApi {
+              
+                  @KeyedCircuitBreaker(name = "mixed")
+                  CompletableFuture<String> tracked(String id);
+              
+                  CompletableFuture<Void> untracked(String id);
               }
-
-              public CompletableFuture<Void> untracked(String id) {
-                  return CompletableFuture.completedFuture(null);
+              """,
+          """
+              com.example.MixedImpl
+              package com.example;
+              
+              import org.springframework.stereotype.Component;
+              import java.util.concurrent.CompletableFuture;
+              
+              @Component
+              public class MixedImpl implements MixedApi {
+              
+                  public CompletableFuture<String> tracked(String id) {
+                      return CompletableFuture.completedFuture("ok");
+                  }
+              
+                  public CompletableFuture<Void> untracked(String id) {
+                      return CompletableFuture.completedFuture(null);
+                  }
               }
-          }
-          """);
+              """);
 
       assertThat(c).succeeded();
       assertThat(c)
-          .generatedSourceFile("com.example.MixedClientKeyedCbProxy")
+          .generatedSourceFile("com.example.MixedApiKeyedCbProxy")
           .contentsAsUtf8String()
           .contains("delegate.untracked(id)");
-    }
-
-    @Test
-    @DisplayName("configName defaults to empty (blank) in generated code")
-    void configNameDefaultsToBlankInGeneratedCode() {
-      var c = compile("""
-          com.example.DefaultConfigClient
-          package com.example;
-          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
-          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
-          import org.springframework.stereotype.Component;
-          import java.util.concurrent.CompletableFuture;
-          
-          @KeyedCircuitBreakerClient
-          @Component
-          public class DefaultConfigClient {
-              @KeyedCircuitBreaker(name = "myCb")
-              public CompletableFuture<String> fetch(String id) {
-                  return CompletableFuture.completedFuture("ok");
-              }
-          }
-          """);
-
-      assertThat(c).succeeded();
-      var contents = assertThat(c)
-          .generatedSourceFile("com.example.DefaultConfigClientKeyedCbProxy")
-          .contentsAsUtf8String();
-      contents.contains("\"myCb\"");
-      contents.contains("\"\"");
     }
   }
 
@@ -208,289 +318,167 @@ class KeyedCircuitBreakerProcessorTest {
   class ValidationErrors {
 
     @Test
-    @DisplayName("error: @KeyedCircuitBreaker on non-CompletableFuture return type")
-    void errorOnNonFutureReturnType() {
+    @DisplayName("error: @KeyedCircuitBreakerClient only on interface, not class")
+    void errorWhenPlacedOnClass() {
       var c = compile("""
-          com.example.BadClient
+          com.example.NotAllowedClient
           package com.example;
           import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
           import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
           import org.springframework.stereotype.Component;
+          import java.util.concurrent.CompletableFuture;
           
           @KeyedCircuitBreakerClient
           @Component
-          public class BadClient {
-              @KeyedCircuitBreaker(name = "bad")
-              public String notAFuture(String id) { return "bad"; }
+          public class NotAllowedClient {
+              @KeyedCircuitBreaker(name = "cb")
+              public CompletableFuture<String> fetch(String id) { return CompletableFuture.completedFuture("ok"); }
           }
           """);
+
+      assertThat(c).failed();
+      assertThat(c).hadErrorContaining("can only be placed on an interface");
+    }
+
+    @Test
+    @DisplayName("error: method must return CompletableFuture")
+    void errorOnNonFutureReturnType() {
+      var c = compile(
+          """
+              com.example.BadApi
+              package com.example;
+              
+              import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
+              import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
+              
+              @KeyedCircuitBreakerClient(delegate = com.example.BadImpl.class)
+              public interface BadApi {
+              
+                  @KeyedCircuitBreaker(name = "bad")
+                  String notAFuture(String id);
+              }
+              """,
+          """
+              com.example.BadImpl
+              package com.example;
+              
+              import org.springframework.stereotype.Component;
+              
+              @Component
+              public class BadImpl implements BadApi {
+              
+                  public String notAFuture(String id) {
+                      return "bad";
+                  }
+              }
+              """);
 
       assertThat(c).failed();
       assertThat(c).hadErrorContaining("CompletableFuture");
     }
 
     @Test
-    @DisplayName("error: keyResolverMethod does not exist on type")
-    void errorWhenKeyResolverNotFound() {
-      var c = compile("""
-          com.example.MissingResolverClient
-          package com.example;
-          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
-          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
-          import org.springframework.stereotype.Component;
-          import java.util.concurrent.CompletableFuture;
-          
-          @KeyedCircuitBreakerClient
-          @Component
-          public class MissingResolverClient {
-              @KeyedCircuitBreaker(name = "cb", keyResolverMethod = "doesNotExist")
-              public CompletableFuture<String> fetch(String id) { return CompletableFuture.completedFuture("ok"); }
-          }
-          """);
+    @DisplayName("error: requires an explicit delegate")
+    void interfaceWithMultipleImplementersErrors() {
+      var c = compile(
+          """
+              com.example.Svc
+              package com.example;
+              
+              import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
+              import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
+              import java.util.concurrent.CompletableFuture;
+              
+              @KeyedCircuitBreakerClient
+              public interface Svc {
+              
+                  @KeyedCircuitBreaker(name = "cb")
+                  CompletableFuture<String> call(String id);
+              }
+              """,
+          """
+              com.example.SvcImplA
+              package com.example;
+              
+              import org.springframework.stereotype.Component;
+              import java.util.concurrent.CompletableFuture;
+              
+              @Component
+              public class SvcImplA implements Svc {
+              
+                  public CompletableFuture<String> call(String id) {
+                      return CompletableFuture.completedFuture("a");
+                  }
+              }
+              """,
+          """
+              com.example.SvcImplB
+              package com.example;
+              
+              import org.springframework.stereotype.Component;
+              import java.util.concurrent.CompletableFuture;
+              
+              @Component
+              public class SvcImplB implements Svc {
+              
+                  public CompletableFuture<String> call(String id) {
+                      return CompletableFuture.completedFuture("b");
+                  }
+              }
+              """);
 
       assertThat(c).failed();
-      assertThat(c).hadErrorContaining("doesNotExist");
+      assertThat(c).hadErrorContaining("requires either an explicit delegate or at least one concrete Spring bean implementing it");
     }
 
     @Test
-    @DisplayName("error: keyResolverMethod returns non-String type")
-    void errorWhenKeyResolverReturnsWrongType() {
-      var c = compile("""
-          com.example.WrongReturnClient
-          package com.example;
-          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
-          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
-          import org.springframework.stereotype.Component;
-          import java.util.concurrent.CompletableFuture;
-          
-          @KeyedCircuitBreakerClient
-          @Component
-          public class WrongReturnClient {
-              @KeyedCircuitBreaker(name = "cb", keyResolverMethod = "resolveKey")
-              public CompletableFuture<String> fetch(String id) { return CompletableFuture.completedFuture("ok"); }
-
-              public int resolveKey(String id) { return 1; }
-          }
-          """);
-
-      assertThat(c).failed();
-      assertThat(c).hadErrorContaining("resolveKey");
-    }
-
-    @Test
-    @DisplayName("error: keyResolverMethod params don't match original method params")
-    void errorWhenKeyResolverParamsMismatch() {
-      var c = compile("""
-          com.example.MismatchClient
-          package com.example;
-          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
-          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
-          import org.springframework.stereotype.Component;
-          import java.util.concurrent.CompletableFuture;
-          
-          @KeyedCircuitBreakerClient
-          @Component
-          public class MismatchClient {
-              @KeyedCircuitBreaker(name = "cb", keyResolverMethod = "resolveKey")
-              public CompletableFuture<String> fetch(String id) { return CompletableFuture.completedFuture("ok"); }
-
-              public String resolveKey(String id, String extra) { return id + extra; }
-          }
-          """);
-
-      assertThat(c).failed();
-      assertThat(c).hadErrorContaining("resolveKey");
-    }
-
-    @Test
-    @DisplayName("error: fallbackMethod does not exist on type")
-    void errorWhenFallbackNotFound() {
-      var c = compile("""
-          com.example.NoFallbackClient
-          package com.example;
-          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
-          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
-          import org.springframework.stereotype.Component;
-          import java.util.concurrent.CompletableFuture;
-          
-          @KeyedCircuitBreakerClient
-          @Component
-          public class NoFallbackClient {
-              @KeyedCircuitBreaker(name = "cb", fallbackMethod = "missingFallback")
-              public CompletableFuture<String> fetch(String id) { return CompletableFuture.completedFuture("ok"); }
-          }
-          """);
+    @DisplayName("error: static at contract method")
+    void interfaceWithStaticContractMethod() {
+      var c = compile(
+          """
+              com.example.OrderApi
+              package com.example;
+              
+              import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
+              import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
+              import java.util.concurrent.CompletableFuture;
+              import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+              
+              @KeyedCircuitBreakerClient(delegate = OrderClientImpl.class)
+              public interface OrderApi {
+              
+                  @KeyedCircuitBreaker(name = "order", keyResolverMethod = "resolveOrderKey", fallbackMethod = "fetchOrderFallback")
+                  CompletableFuture<String> fetchOrder(String region, String tier);
+              
+                  static String resolveOrderKey(String region, String tier) { return region + ":" + tier; };
+              
+                  default CompletableFuture<String> fetchOrderFallback(String region, String tier, CallNotPermittedException e) { return CompletableFuture.failedFuture(new RuntimeException("cb error")); };
+              
+                  CompletableFuture<Void> cancelOrder(String id);
+              }
+              """,
+          """
+              com.example.OrderClientImpl
+              package com.example;
+              
+              import org.springframework.stereotype.Component;
+              import java.util.concurrent.CompletableFuture;
+              
+              @Component
+              public class OrderClientImpl implements OrderApi {
+              
+                  public CompletableFuture<String> fetchOrder(String region, String tier) {
+                      return CompletableFuture.completedFuture("ok");
+                  }
+              
+                  public CompletableFuture<Void> cancelOrder(String id) {
+                      return CompletableFuture.completedFuture(null);
+                  }
+              }
+              """);
 
       assertThat(c).failed();
-      assertThat(c).hadErrorContaining("missingFallback");
+      assertThat(c).hadErrorContaining("Key resolver 'resolveOrderKey' on 'OrderApi' is static, but must be non-static");
     }
-
-    @Test
-    @DisplayName("error: fallbackMethod missing trailing Throwable param")
-    void errorWhenFallbackMissingThrowable() {
-      var c = compile("""
-          com.example.BadFallbackClient
-          package com.example;
-          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
-          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
-          import org.springframework.stereotype.Component;
-          import java.util.concurrent.CompletableFuture;
-          
-          @KeyedCircuitBreakerClient
-          @Component
-          public class BadFallbackClient {
-              @KeyedCircuitBreaker(name = "cb", fallbackMethod = "fetchFallback")
-              public CompletableFuture<String> fetch(String id) { return CompletableFuture.completedFuture("ok"); }
-          
-              public CompletableFuture<String> fetchFallback(String id) { return CompletableFuture.completedFuture("fb"); }
-          }
-          """);
-
-      assertThat(c).failed();
-      assertThat(c).hadErrorContaining("fetchFallback");
-    }
-
-    @Test
-    @DisplayName("warning (not error): @KeyedCircuitBreakerClient with no annotated methods")
-    void warningWhenNoAnnotatedMethods() {
-      var c = compile("""
-          com.example.EmptyClient
-          package com.example;
-          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
-          import org.springframework.stereotype.Component;
-          import java.util.concurrent.CompletableFuture;
-          
-          @KeyedCircuitBreakerClient
-          @Component
-          public class EmptyClient {
-              public CompletableFuture<String> plain(String id) { return CompletableFuture.completedFuture("ok"); }
-          }
-          """);
-
-      assertThat(c).succeeded();
-      assertThat(c).hadWarningContaining("no @KeyedCircuitBreaker methods");
-    }
-
-    @Test
-    @DisplayName("error: @KeyedCircuitBreakerClient on final class")
-    void errorOnFinalClass() {
-      var c = compile("""
-          com.example.FinalClient
-          package com.example;
-          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
-          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
-          import org.springframework.stereotype.Component;
-          import java.util.concurrent.CompletableFuture;
-
-          @KeyedCircuitBreakerClient
-          @Component
-          public final class FinalClient {
-              @KeyedCircuitBreaker(name = "cb")
-              public CompletableFuture<String> fetch(String id) { return CompletableFuture.completedFuture("ok"); }
-          }
-          """);
-
-      assertThat(c).failed();
-      assertThat(c).hadErrorContaining("cannot be placed on a final class");
-    }
-
-    @Test
-    @DisplayName("error: @KeyedCircuitBreakerClient requires Spring bean annotation")
-    void errorWhenNotSpringBean() {
-      var c = compile("""
-          com.example.NoBeanClient
-          package com.example;
-          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
-          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
-          import java.util.concurrent.CompletableFuture;
-
-          @KeyedCircuitBreakerClient
-          public class NoBeanClient {
-              @KeyedCircuitBreaker(name = "cb")
-              public CompletableFuture<String> fetch(String id) { return CompletableFuture.completedFuture("ok"); }
-          }
-          """);
-
-      assertThat(c).failed();
-      assertThat(c).hadErrorContaining("requires the class to be a Spring bean");
-    }
-
-    @Test
-    @DisplayName("error: @KeyedCircuitBreakerClient cannot be placed on a @Primary class")
-    void errorWhenPrimaryClass() {
-      var c = compile("""
-          com.example.PrimaryClient
-          package com.example;
-          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
-          import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
-          import org.springframework.stereotype.Component;
-          import org.springframework.context.annotation.Primary;
-          import java.util.concurrent.CompletableFuture;
-
-          @KeyedCircuitBreakerClient
-          @Component
-          @Primary
-          public class PrimaryClient {
-              @KeyedCircuitBreaker(name = "cb")
-              public CompletableFuture<String> fetch(String id) { return CompletableFuture.completedFuture("ok"); }
-          }
-          """);
-
-      assertThat(c).failed();
-      assertThat(c).hadErrorContaining("cannot be placed on a @Primary class");
-    }
-  }
-
-  private String orderClientWithKeyResolver() {
-    return """
-        com.example.OrderClient
-        package com.example;
-        import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
-        import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
-        import org.springframework.stereotype.Component;
-        import java.util.concurrent.CompletableFuture;
-        
-        @KeyedCircuitBreakerClient
-        @Component
-        public class OrderClient {
-        
-            @KeyedCircuitBreaker(name = "order", keyResolverMethod = "resolveOrderKey")
-            public CompletableFuture<String> fetchOrder(String region, String tier) { return CompletableFuture.completedFuture("ok"); }
-        
-            public String resolveOrderKey(String region, String tier) { return region + ":" + tier; }
-        
-            public CompletableFuture<Void> cancelOrder(String id) { return CompletableFuture.completedFuture(null); }
-        }
-        """;
-  }
-
-  private String orderClientWithKeyResolverAndFallback() {
-    return """
-        com.example.OrderClient
-        package com.example;
-        import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreakerClient;
-        import io.github.harpuiasaber.resilience4j.cb.extension.annotation.KeyedCircuitBreaker;
-        import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
-        import org.springframework.stereotype.Component;
-        import java.util.concurrent.CompletableFuture;
-        
-        @KeyedCircuitBreakerClient
-        @Component
-        public class OrderClient {
-        
-            @KeyedCircuitBreaker(
-                name = "order",
-                keyResolverMethod = "resolveOrderKey",
-                fallbackMethod = "fetchOrderFallback"
-            )
-            public CompletableFuture<String> fetchOrder(String region, String tier) { return CompletableFuture.completedFuture("ok"); }
-        
-            public String resolveOrderKey(String region, String tier) { return region + ":" + tier; }
-        
-            public CompletableFuture<String> fetchOrderFallback(String region, String tier, CallNotPermittedException t) { return CompletableFuture.completedFuture("fallback"); }
-        
-            public CompletableFuture<Void> cancelOrder(String id) { return CompletableFuture.completedFuture(null); }
-        }
-        """;
   }
 }
