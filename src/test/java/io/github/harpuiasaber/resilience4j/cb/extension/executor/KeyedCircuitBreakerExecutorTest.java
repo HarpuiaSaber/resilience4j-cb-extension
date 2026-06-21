@@ -1,17 +1,16 @@
 package io.github.harpuiasaber.resilience4j.cb.extension.executor;
 
+import io.github.harpuiasaber.resilience4j.cb.extension.exception.CircuitBreakerInternalException;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
-import io.github.harpuiasaber.resilience4j.cb.extension.exception.CircuitBreakerInternalException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
@@ -43,7 +42,8 @@ class KeyedCircuitBreakerExecutorTest {
 
   @BeforeEach
   void setUp() {
-    registry = CircuitBreakerRegistry.of(Map.of(CONFIG_NAME, CONFIG));
+    registry = CircuitBreakerRegistry.ofDefaults();
+    registry.circuitBreaker(BASE_NAME, CONFIG);
     executor = new KeyedCircuitBreakerExecutor(registry);
   }
 
@@ -425,7 +425,8 @@ class KeyedCircuitBreakerExecutorTest {
             throw new RuntimeException("predicate error");
           })
           .build();
-      registry = CircuitBreakerRegistry.of(Map.of(CONFIG_NAME, CONFIG, ERROR_CONFIG_NAME, errorConfig));
+      registry = CircuitBreakerRegistry.ofDefaults();
+      registry.circuitBreaker(BASE_NAME, errorConfig);
       executor = new KeyedCircuitBreakerExecutor(registry);
     }
 

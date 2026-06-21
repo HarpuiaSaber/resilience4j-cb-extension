@@ -1,10 +1,10 @@
 package io.github.harpuiasaber.resilience4j.cb.extension.executor;
 
+import io.github.harpuiasaber.resilience4j.cb.extension.exception.CircuitBreakerInternalException;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.core.ConfigurationNotFoundException;
-import io.github.harpuiasaber.resilience4j.cb.extension.exception.CircuitBreakerInternalException;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
@@ -59,7 +59,7 @@ public class KeyedCircuitBreakerExecutor {
                                           Supplier<CompletableFuture<T>> executionStage,
                                           Function<CallNotPermittedException, CompletableFuture<T>> fallback) {
     var resolveInstanceName = resolveInstanceName(baseName, key);
-    var resolvedConfig = resolveConfig(configName, resolveInstanceName);
+    var resolvedConfig = resolveConfig(configName, baseName);
     var cb = registry.circuitBreaker(resolveInstanceName, resolvedConfig);
     // If circuit is OPEN (no permission):
     // - Previously: fail the future immediately with CallNotPermittedException
@@ -146,14 +146,17 @@ public class KeyedCircuitBreakerExecutor {
    * @throws ConfigurationNotFoundException if neither instanceName nor configName exists in registry
    */
   CircuitBreakerConfig resolveConfig(String configName, String instanceName) {
-    CircuitBreakerConfig config = null;
     if (configName != null && !configName.isBlank()) {
-      config = registry.getConfiguration(configName).orElse(null);
+      var config = registry.find(configName);
+      if (config.isPresent()) {
+        return config.get().getCircuitBreakerConfig();
+      }
     }
-    if (config != null) {
-      return config;
+    var config = registry.find(instanceName);
+    if (config.isPresent()) {
+      return config.get().getCircuitBreakerConfig();
     }
-    return registry.getConfiguration(instanceName).orElseThrow(() -> new ConfigurationNotFoundException(instanceName));
+    throw new ConfigurationNotFoundException(instanceName);
   }
 
   private <T> CompletableFuture<T> safeFallback(Function<CallNotPermittedException, CompletableFuture<T>> fallback, CallNotPermittedException t) {

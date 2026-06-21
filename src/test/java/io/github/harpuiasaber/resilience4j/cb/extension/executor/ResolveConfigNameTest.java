@@ -1,5 +1,6 @@
 package io.github.harpuiasaber.resilience4j.cb.extension.executor;
 
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.core.ConfigurationNotFoundException;
@@ -28,61 +29,61 @@ class ResolveConfigNameTest {
   @Test
   @DisplayName("configName exists → use configName")
   void instanceNameExists() {
-    var instanceConfig = CircuitBreakerConfig.custom().build();
-    when(registry.getConfiguration("payment"))
-        .thenReturn(Optional.of(instanceConfig));
+    var circuitBreaker = CircuitBreaker.of("payment", CircuitBreakerConfig.custom().build());
+    when(registry.find("payment"))
+        .thenReturn(Optional.of(circuitBreaker));
     var result = executor.resolveConfig("payment", "payment:VN:PREMIUM");
-    assertThat(result).isEqualTo(instanceConfig);
+    assertThat(result).isEqualTo(circuitBreaker.getCircuitBreakerConfig());
   }
 
   @Test
   @DisplayName("configName missing, instanceName exists → use instanceName")
   void fallbackToConfigName() {
-    var fallbackConfig = CircuitBreakerConfig.custom().build();
-    when(registry.getConfiguration("payment"))
+    var circuitBreaker = CircuitBreaker.of("payment:VN:PREMIUM", CircuitBreakerConfig.custom().build());
+    when(registry.find("payment"))
         .thenReturn(Optional.empty());
-    when(registry.getConfiguration("payment:VN:PREMIUM"))
-        .thenReturn(Optional.of(fallbackConfig));
+    when(registry.find("payment:VN:PREMIUM"))
+        .thenReturn(Optional.of(circuitBreaker));
     var result = executor.resolveConfig("payment", "payment:VN:PREMIUM");
-    assertThat(result).isEqualTo(fallbackConfig);
+    assertThat(result).isEqualTo(circuitBreaker.getCircuitBreakerConfig());
   }
 
   @Test
   @DisplayName("null configName → only instanceName used")
   void nullConfigName() {
-    var instanceConfig = CircuitBreakerConfig.custom().build();
-    when(registry.getConfiguration("payment:VN:PREMIUM"))
-        .thenReturn(Optional.of(instanceConfig));
+    var circuitBreaker = CircuitBreaker.of("payment:VN:PREMIUM", CircuitBreakerConfig.custom().build());
+    when(registry.find("payment:VN:PREMIUM"))
+        .thenReturn(Optional.of(circuitBreaker));
     var result = executor.resolveConfig(null, "payment:VN:PREMIUM");
-    assertThat(result).isEqualTo(instanceConfig);
+    assertThat(result).isEqualTo(circuitBreaker.getCircuitBreakerConfig());
   }
 
   @Test
   @DisplayName("empty configName → only instanceName used")
   void emptyConfigName() {
-    var instanceConfig = CircuitBreakerConfig.custom().build();
-    when(registry.getConfiguration("payment:VN:PREMIUM"))
-        .thenReturn(Optional.of(instanceConfig));
+    var circuitBreaker = CircuitBreaker.of("payment:VN:PREMIUM", CircuitBreakerConfig.custom().build());
+    when(registry.find("payment:VN:PREMIUM"))
+        .thenReturn(Optional.of(circuitBreaker));
     var result = executor.resolveConfig("", "payment:VN:PREMIUM");
-    assertThat(result).isEqualTo(instanceConfig);
+    assertThat(result).isEqualTo(circuitBreaker.getCircuitBreakerConfig());
   }
 
   @Test
   @DisplayName("blank configName → only instanceName used")
   void blankConfigName() {
-    var instanceConfig = CircuitBreakerConfig.custom().build();
-    when(registry.getConfiguration("payment:VN:PREMIUM"))
-        .thenReturn(Optional.of(instanceConfig));
+    var circuitBreaker = CircuitBreaker.of("payment:VN:PREMIUM", CircuitBreakerConfig.custom().build());
+    when(registry.find("payment:VN:PREMIUM"))
+        .thenReturn(Optional.of(circuitBreaker));
     var result = executor.resolveConfig("   ", "payment:VN:PREMIUM");
-    assertThat(result).isEqualTo(instanceConfig);
+    assertThat(result).isEqualTo(circuitBreaker.getCircuitBreakerConfig());
   }
 
   @Test
   @DisplayName("no config found → throw exception")
   void notFound() {
-    when(registry.getConfiguration("payment:VN:PREMIUM"))
+    when(registry.find("payment:VN:PREMIUM"))
         .thenReturn(Optional.empty());
-    when(registry.getConfiguration("payment"))
+    when(registry.find("payment"))
         .thenReturn(Optional.empty());
     assertThatThrownBy(() -> executor.resolveConfig("payment", "payment:VN:PREMIUM"))
         .isInstanceOf(ConfigurationNotFoundException.class);
