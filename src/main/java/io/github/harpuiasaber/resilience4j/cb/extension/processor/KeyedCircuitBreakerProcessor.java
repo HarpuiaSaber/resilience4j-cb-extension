@@ -124,12 +124,14 @@ public class KeyedCircuitBreakerProcessor extends AbstractProcessor {
       if (isAssignable(delegateTypeMirror, voidType)) {
         error(typeElement, "@KeyedCircuitBreakerClient on interface '%s' requires either an explicit delegate or at least one concrete Spring bean implementing it.",
             typeElement.getSimpleName());
+        return null;
       }
       if (isAssignable(delegateTypeMirror, typeElement.asType())) {
         return (TypeElement) typeUtils.asElement(delegateTypeMirror);
       }
       error(typeElement, "Delegate type '%s' specified in @KeyedCircuitBreakerClient on '%s' is not assignable to the interface.",
           delegateTypeMirror.toString(), typeElement.getSimpleName());
+      return null;
     }
     error(typeElement, "@KeyedCircuitBreakerClient on interface '%s' requires either an explicit delegate or at least one concrete Spring bean implementing it.",
         typeElement.getSimpleName());
